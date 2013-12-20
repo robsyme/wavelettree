@@ -1,0 +1,6 @@
+wavelettree
+===========
+
+Rough sketches of wavelet trees for providing fast rank queries on non-binary alphabets. At the moment, it is simply a learning tool to help me get my head around some interesting datastructures.
+
+The package will eventually steer towards bioinformatics-specific functions, and is not meant as a general purpose implementation. 
