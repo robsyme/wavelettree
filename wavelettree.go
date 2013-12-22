@@ -54,7 +54,7 @@ func (tree *WaveletTree) rank(position uint, query byte, depth uint) uint {
 // just a placeholder.
 func (tree *WaveletTree) binaryRank(position uint, query bool) uint {
 	count := uint(0)
-	for i := uint(0); i < position; i++ {
+	for i := uint(0); i < uint(position); i++ {
 		if tree.bitVector.Test(i) {
 			count += 1
 		}
@@ -62,7 +62,7 @@ func (tree *WaveletTree) binaryRank(position uint, query bool) uint {
 	if query {
 		return count
 	}
-	return position - count
+	return uint(position) - count
 }
 
 func makeTree(data []byte, depth uint) *WaveletTree {
