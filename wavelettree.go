@@ -4,7 +4,6 @@ package wavelettree
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/robsyme/succinctBitSet"
 )
 
@@ -22,10 +21,7 @@ type WaveletTree struct {
 // alphabet which will speed up Rank queries, particularly for small
 // alphabets (AGTC, for example).
 func New(data []byte) *WaveletTree {
-	fmt.Printf("MAKING NEW TREE: %v\n", data)
 	tree := makeTree(data, 0)
-	fmt.Println("DEBUG")
-	fmt.Println(tree)
 	return tree
 }
 
@@ -39,8 +35,6 @@ func (tree *WaveletTree) string(depth int) string {
 	for i := 0; i < depth; i++ {
 		buffer.WriteByte(' ')
 	}
-
-	fmt.Fprintln(&buffer, tree.bitVector)
 
 	if tree.ones != nil {
 		depth++
@@ -62,7 +56,6 @@ func (tree *WaveletTree) Rank(position uint, query byte) uint {
 }
 
 func (tree *WaveletTree) rank(position uint, query byte, depth uint) uint {
-	fmt.Printf("Looking for %c (%08b) at depth %d:\n", query, query, depth)
 	boolQuery := (query>>depth)%2 == 1
 
 	var nextTree *WaveletTree
@@ -84,14 +77,11 @@ func (tree *WaveletTree) rank(position uint, query byte, depth uint) uint {
 // TODO This should be implemented with RRR datastructures. This is
 // just a placeholder.
 func (tree *WaveletTree) binaryRank(position uint, query bool) uint {
-	fmt.Printf("binaryRank(%d, %t) = ", position, query)
 	count := tree.bitVector.Rank(position)
 
 	if query {
-		fmt.Println(count)
 		return count
 	}
-	fmt.Println(position - count)
 	return uint(position) - count
 }
 
@@ -105,40 +95,20 @@ func makeTree(data []byte, depth uint) *WaveletTree {
 	popcount := 0
 	bits := make(chan bool, len(data))
 	go func() {
-		fmt.Fprintf(&outBuffer, "Depth=%d ", depth)
 		outBuffer.WriteString("\033[39m[ ")
 		for _, b := range data {
 			if (b>>depth)%2 == 1 {
 				popcount++
 				bits <- true
-				// var formatBuffer bytes.Buffer
-				// if depth > 0 {
-				// 	fmt.Fprintf(&formatBuffer, "\033[39m%%0%db\033[32m%%c\033[39m%%0%db ", 7-depth, depth)
-				// 	fmt.Fprintf(&outBuffer, formatBuffer.String(), b>>depth, b, b&(1<<(depth)-1))
-				// } else {
-				// 	fmt.Fprintf(&formatBuffer, "\033[39m%%0%db\033[32m%%c ", 7-depth)
-				// 	fmt.Fprintf(&outBuffer, formatBuffer.String(), b>>depth, b)
-				// }
 			} else {
 				bits <- false
-				// var formatBuffer bytes.Buffer
-				// if depth > 0 {
-				// 	fmt.Fprintf(&formatBuffer, "\033[39m%%0%db\033[31m%%c\033[39m%%0%db ", 7-depth, depth)
-				// 	fmt.Fprintf(&outBuffer, formatBuffer.String(), b>>depth, b, b&(1<<(depth)-1))
-				// } else {
-				// 	fmt.Fprintf(&formatBuffer, "\033[39m%%0%db\033[31m%%c ", 7-depth)
-				// 	fmt.Fprintf(&outBuffer, formatBuffer.String(), b>>depth, b)
-				// }
 			}
 		}
 		outBuffer.WriteString("\033[39m]")
-		fmt.Println(outBuffer.String())
 		close(bits)
 	}()
 
 	tree.bitVector.AddFromBoolChan(bits)
-
-	fmt.Println(tree.bitVector)
 
 	if depth < 8 && len(data) > 1 {
 		zeros, ones := divideData(data, depth, popcount)
