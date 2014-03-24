@@ -74,8 +74,6 @@ func (tree *WaveletTree) rank(position uint, query byte, depth uint) uint {
 	return tree.binaryRank(position, boolQuery)
 }
 
-// TODO This should be implemented with RRR datastructures. This is
-// just a placeholder.
 func (tree *WaveletTree) binaryRank(position uint, query bool) uint {
 	count := tree.bitVector.Rank(position)
 
@@ -90,27 +88,50 @@ func makeTree(data []byte, depth uint) *WaveletTree {
 		bitVector: succinctBitSet.New(),
 	}
 
-	var outBuffer bytes.Buffer
+	// var outBuffer bytes.Buffer
 
 	popcount := 0
 	bits := make(chan bool, len(data))
 	go func() {
-		outBuffer.WriteString("\033[39m[ ")
+		// outBuffer.WriteString("\033[39m[ ")
 		for _, b := range data {
 			if (b>>depth)%2 == 1 {
 				popcount++
 				bits <- true
+				// var formatBuffer bytes.Buffer
+				// if depth == 0 {
+				// 	fmt.Fprintf(&formatBuffer, "\033[39m%%0%db\033[32m%%c ", 7-depth)
+				// 	fmt.Fprintf(&outBuffer, formatBuffer.String(), b>>depth, b)
+				// } else if depth >= 7 {
+				// 	fmt.Fprintf(&formatBuffer, "\033[32m%%c\033[39m%%0%db ", depth-1)
+				// 	fmt.Fprintf(&outBuffer, formatBuffer.String(), b, b&(1<<(depth)-1))
+				// } else {
+				// 	fmt.Fprintf(&formatBuffer, "\033[39m%%0%db\033[32m%%c\033[39m%%0%db ", 7-depth, depth)
+				// 	fmt.Fprintf(&outBuffer, formatBuffer.String(), b>>depth, b, b&(1<<(depth)-1))
+				// }
 			} else {
 				bits <- false
+				// var formatBuffer bytes.Buffer
+				// if depth == 0 {
+				// 	fmt.Fprintf(&formatBuffer, "\033[39m%%0%db\033[31m%%c ", 7-depth)
+				// 	fmt.Fprintf(&outBuffer, formatBuffer.String(), b>>depth, b)
+				// } else if depth >= 7 {
+				// 	fmt.Fprintf(&formatBuffer, "\033[31m%%c\033[39m%%0%db ", depth-1)
+				// 	fmt.Fprintf(&outBuffer, formatBuffer.String(), b, b&(1<<(depth)-1))
+				// } else {
+				// 	fmt.Fprintf(&formatBuffer, "\033[39m%%0%db\033[31m%%c\033[39m%%0%db ", 7-depth, depth)
+				// 	fmt.Fprintf(&outBuffer, formatBuffer.String(), b>>depth, b, b&(1<<(depth)-1))
+				// }
 			}
 		}
-		outBuffer.WriteString("\033[39m]")
+		// outBuffer.WriteString("\033[39m]")
+		// fmt.Println(outBuffer.String())
 		close(bits)
 	}()
 
 	tree.bitVector.AddFromBoolChan(bits)
 
-	if depth < 8 && len(data) > 1 {
+	if depth < 7 {
 		zeros, ones := divideData(data, depth, popcount)
 		if len(zeros) > 0 {
 			tree.zeros = makeTree(zeros, depth+1)
