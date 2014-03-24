@@ -38,12 +38,12 @@ func (tree *WaveletTree) string(depth int) string {
 
 	if tree.ones != nil {
 		depth++
-		buffer.WriteString(tree.ones.string(depth))
+		buffer.WriteString("+" + tree.ones.string(depth))
 	}
 
 	if tree.zeros != nil {
 		depth++
-		buffer.WriteString(tree.zeros.string(depth))
+		buffer.WriteString("-" + tree.zeros.string(depth))
 	}
 
 	return buffer.String()
