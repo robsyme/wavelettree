@@ -3,26 +3,56 @@
 package wavelettree
 
 import (
-	"github.com/willf/bitset"
+	"bytes"
+	"fmt"
+	"github.com/robsyme/succinctBitSet"
 )
 
 type WaveletTree struct {
 	depth     uint8
 	zeros     *WaveletTree
 	ones      *WaveletTree
-	bitVector *bitset.BitSet
+	bitVector *succinctBitSet.BitSet
 }
 
 // New returns a pointer to a wavelet tree derived from the given
 // bytes. At the moment, the package assumes an alphabet size of 256.
-// This means that queries have to traverse 8 trees for each query. In
-// a future release, you will be able to specify an alphabet which
-// will speed up Rank queries, particularly for small alphabets (AGTC,
-// for example).
+// This means that queries have to traverse Log2(256) = 8 trees for
+// each query. In a future release, you will be able to specify an
+// alphabet which will speed up Rank queries, particularly for small
+// alphabets (AGTC, for example).
 func New(data []byte) *WaveletTree {
+	fmt.Printf("MAKING NEW TREE: %v\n", data)
 	tree := makeTree(data, 0)
-
+	fmt.Println("DEBUG")
+	fmt.Println(tree)
 	return tree
+}
+
+func (tree *WaveletTree) String() string {
+	return tree.string(0)
+}
+
+func (tree *WaveletTree) string(depth int) string {
+	var buffer bytes.Buffer
+
+	for i := 0; i < depth; i++ {
+		buffer.WriteByte(' ')
+	}
+
+	fmt.Fprintln(&buffer, tree.bitVector)
+
+	if tree.ones != nil {
+		depth++
+		buffer.WriteString(tree.ones.string(depth))
+	}
+
+	if tree.zeros != nil {
+		depth++
+		buffer.WriteString(tree.zeros.string(depth))
+	}
+
+	return buffer.String()
 }
 
 // Rank returns the number of occurences of 'query' in the first
@@ -32,6 +62,7 @@ func (tree *WaveletTree) Rank(position uint, query byte) uint {
 }
 
 func (tree *WaveletTree) rank(position uint, query byte, depth uint) uint {
+	fmt.Printf("Looking for %c (%08b) at depth %d:\n", query, query, depth)
 	boolQuery := (query>>depth)%2 == 1
 
 	var nextTree *WaveletTree
@@ -53,50 +84,88 @@ func (tree *WaveletTree) rank(position uint, query byte, depth uint) uint {
 // TODO This should be implemented with RRR datastructures. This is
 // just a placeholder.
 func (tree *WaveletTree) binaryRank(position uint, query bool) uint {
-	count := uint(0)
-	for i := uint(0); i < uint(position); i++ {
-		if tree.bitVector.Test(i) {
-			count += 1
-		}
-	}
+	fmt.Printf("binaryRank(%d, %t) = ", position, query)
+	count := tree.bitVector.Rank(position)
+
 	if query {
+		fmt.Println(count)
 		return count
 	}
+	fmt.Println(position - count)
 	return uint(position) - count
 }
 
 func makeTree(data []byte, depth uint) *WaveletTree {
 	tree := WaveletTree{
-		bitVector: bitset.New(uint(len(data))),
+		bitVector: succinctBitSet.New(),
 	}
 
-	for i, b := range data {
-		if (b>>depth)%2 == 1 {
-			tree.bitVector.Set(uint(i))
+	var outBuffer bytes.Buffer
+
+	popcount := 0
+	bits := make(chan bool, len(data))
+	go func() {
+		fmt.Fprintf(&outBuffer, "Depth=%d ", depth)
+		outBuffer.WriteString("\033[39m[ ")
+		for _, b := range data {
+			if (b>>depth)%2 == 1 {
+				popcount++
+				bits <- true
+				// var formatBuffer bytes.Buffer
+				// if depth > 0 {
+				// 	fmt.Fprintf(&formatBuffer, "\033[39m%%0%db\033[32m%%c\033[39m%%0%db ", 7-depth, depth)
+				// 	fmt.Fprintf(&outBuffer, formatBuffer.String(), b>>depth, b, b&(1<<(depth)-1))
+				// } else {
+				// 	fmt.Fprintf(&formatBuffer, "\033[39m%%0%db\033[32m%%c ", 7-depth)
+				// 	fmt.Fprintf(&outBuffer, formatBuffer.String(), b>>depth, b)
+				// }
+			} else {
+				bits <- false
+				// var formatBuffer bytes.Buffer
+				// if depth > 0 {
+				// 	fmt.Fprintf(&formatBuffer, "\033[39m%%0%db\033[31m%%c\033[39m%%0%db ", 7-depth, depth)
+				// 	fmt.Fprintf(&outBuffer, formatBuffer.String(), b>>depth, b, b&(1<<(depth)-1))
+				// } else {
+				// 	fmt.Fprintf(&formatBuffer, "\033[39m%%0%db\033[31m%%c ", 7-depth)
+				// 	fmt.Fprintf(&outBuffer, formatBuffer.String(), b>>depth, b)
+				// }
+			}
 		}
-	}
+		outBuffer.WriteString("\033[39m]")
+		fmt.Println(outBuffer.String())
+		close(bits)
+	}()
+
+	tree.bitVector.AddFromBoolChan(bits)
+
+	fmt.Println(tree.bitVector)
 
 	if depth < 8 && len(data) > 1 {
-		zeros, ones := divideData(data, tree.bitVector, depth)
-		tree.zeros = makeTree(zeros, depth+1)
-		tree.ones = makeTree(ones, depth+1)
+		zeros, ones := divideData(data, depth, popcount)
+		if len(zeros) > 0 {
+			tree.zeros = makeTree(zeros, depth+1)
+		}
+		if len(ones) > 0 {
+			tree.ones = makeTree(ones, depth+1)
+		}
 	}
-
 	return &tree
 }
 
-func divideData(data []byte, bitVector *bitset.BitSet, depth uint) (zeros, ones []byte) {
-	zeros = make([]byte, uint(len(data))-bitVector.Count())
-	ones = make([]byte, bitVector.Count())
+func divideData(data []byte, depth uint, popcount int) (zeros, ones []byte) {
 
-	zerocount, onecount := 0, 0
+	zeros = make([]byte, len(data)-popcount)
+	ones = make([]byte, popcount)
+
+	zerosCount := 0
+	onesCount := 0
 	for _, b := range data {
 		if (b>>depth)%2 == 0 {
-			zeros[zerocount] = b
-			zerocount += 1
+			zeros[zerosCount] = b
+			zerosCount++
 		} else {
-			ones[onecount] = b
-			onecount += 1
+			ones[onesCount] = b
+			onesCount++
 		}
 	}
 	return zeros, ones

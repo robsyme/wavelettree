@@ -9,7 +9,6 @@ func TestTreeContruction(t *testing.T) {
 	Convey("Given a tree constructed from the string 'abracadabra'", t, func() {
 		tree := New([]byte("abracadabra"))
 		So(tree, ShouldNotBeNil)
-		So(tree.bitVector.Any(), ShouldBeTrue)
 	})
 }
 
